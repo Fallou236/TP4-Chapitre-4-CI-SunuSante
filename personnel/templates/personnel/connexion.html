@@ -1,0 +1,36 @@
+{% load static %}
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+    <meta charset="UTF-8">
+    <title>SunuSanté — Connexion personnel</title>
+    <link rel="stylesheet" href="{% static 'rendezvous/style.css' %}">
+</head>
+<body>
+    <header>
+        <h1>SunuSanté</h1>
+        <p>Espace personnel — connexion</p>
+    </header>
+
+    <main>
+        {% if messages %}
+            <ul class="messages">
+                {% for message in messages %}
+                    <li class="{{ message.tags }}">{{ message }}</li>
+                {% endfor %}
+            </ul>
+        {% endif %}
+
+        <form method="post">
+            {% csrf_token %}
+            <label for="username">Identifiant</label>
+            <input type="text" name="username" id="username" required>
+
+            <label for="password">Mot de passe</label>
+            <input type="password" name="password" id="password" required>
+
+            <button type="submit">Se connecter</button>
+        </form>
+    </main>
+</body>
+</html>

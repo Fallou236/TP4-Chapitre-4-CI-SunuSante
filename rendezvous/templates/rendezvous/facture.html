@@ -1,0 +1,42 @@
+{% load static %}
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+    <meta charset="UTF-8">
+    <title>SunuSanté — Facture</title>
+    <link rel="stylesheet" href="{% static 'rendezvous/style.css' %}">
+</head>
+<body>
+    <header>
+        <h1>SunuSanté</h1>
+        <p>Facture — {{ patient.prenom }} {{ patient.nom }}</p>
+    </header>
+
+    <main>
+        <table>
+            <thead>
+                <tr>
+                    <th>Type</th>
+                    <th>Date</th>
+                    <th>Prix</th>
+                    <th>Notes</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for rdv in patient.rendez_vous.all %}
+                    <tr>
+                        <td>{{ rdv.get_type_consultation_display }}</td>
+                        <td>{{ rdv.date }}</td>
+                        <td>{{ rdv.prix }} FCFA</td>
+                        {# Échappement automatique de Django (pas de |safe) : #}
+                        {# une note contenant <script> s'affiche comme du texte, ne s'exécute pas. #}
+                        <td>{{ rdv.notes }}</td>
+                    </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+
+        <p class="total">Total : <strong>{{ total }} FCFA</strong></p>
+    </main>
+</body>
+</html>

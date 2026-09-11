@@ -1,0 +1,54 @@
+{% load static %}
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+    <meta charset="UTF-8">
+    <title>SunuSanté — Prendre rendez-vous</title>
+    <link rel="stylesheet" href="{% static 'rendezvous/style.css' %}">
+</head>
+<body>
+    <header>
+        <h1>SunuSanté</h1>
+        <p>Clinique — prise de rendez-vous</p>
+    </header>
+
+    <main>
+        {% if messages %}
+            <ul class="messages">
+                {% for message in messages %}
+                    <li class="{{ message.tags }}">{{ message }}</li>
+                {% endfor %}
+            </ul>
+        {% endif %}
+
+        <form method="post" id="form-rdv" novalidate>
+            {% csrf_token %}
+
+            <label for="patient">Patient</label>
+            <select name="patient" id="patient" required>
+                <option value="">— Choisir —</option>
+                {% for patient in patients %}
+                    <option value="{{ patient.id }}">{{ patient.prenom }} {{ patient.nom }}</option>
+                {% endfor %}
+            </select>
+
+            <label for="type_consultation">Type de consultation</label>
+            <select name="type_consultation" id="type_consultation" required>
+                {% for valeur, libelle in types %}
+                    <option value="{{ valeur }}">{{ libelle }}</option>
+                {% endfor %}
+            </select>
+
+            <label for="date">Date</label>
+            <input type="date" name="date" id="date" required>
+
+            <label for="notes">Notes (facultatif)</label>
+            <textarea name="notes" id="notes" rows="3"></textarea>
+
+            <button type="submit">Confirmer le rendez-vous</button>
+        </form>
+    </main>
+
+    <script src="{% static 'rendezvous/formulaire.js' %}"></script>
+</body>
+</html>
