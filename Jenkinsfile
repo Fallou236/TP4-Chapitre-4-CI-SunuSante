@@ -4,10 +4,6 @@
 // Récupération du code -> Build -> Standard de code -> Tests -> Sécurité.
 // Un stage rouge arrête le pipeline : c'est le "feedback" du serveur CI au
 // dépôt, en quelques minutes plutôt qu'en semaines (cf. chapitre 4, partie 1).
-//
-// Portabilité (voir INSTALLATION_JENKINS.md) : avec l'agent Docker
-// (recommandé), tous les stages tournent dans un conteneur Linux, quel
-// que soit le système d'exploitation qui héberge Jenkins.
 
 def runCmd(String commande) {
     if (isUnix()) {
@@ -23,27 +19,27 @@ pipeline {
     }
 
     environment {
-        // L'agent tourne avec l'UID de Jenkins (1000), sans home accessible
-        // dans python:3.11-slim. On redirige HOME et le cache pip vers le
-        // workspace, où l'UID a les droits en écriture.
-        HOME = "${WORKSPACE}"
-        PIP_CACHE_DIR = "${WORKSPACE}/.pip-cache"
+        // HOME hors du workspace : les dépendances installées avec --user
+        // vont dans /tmp/.local et non dans le dépôt, donc flake8 ne les
+        // analyse pas.
+        HOME = "/tmp/jenkins-home"
+        PIP_CACHE_DIR = "/tmp/jenkins-home/.pip-cache"
     }
 
     stages {
         stage('Récupération du code') {
             steps {
                 checkout scm
+                // Nettoie tout .local/.pip-cache résiduel d'un build
+                // antérieur (créé quand HOME pointait sur le workspace),
+                // sinon flake8 les scannerait encore.
+                runCmd 'rm -rf .local .pip-cache staticfiles'
             }
         }
 
         stage('Installation des dépendances') {
-            // --user installe dans $HOME/.local ; on exporte ensuite
-            // $HOME/.local/bin dans le PATH pour que flake8, semgrep et
-            // pip-audit soient trouvés par les stages suivants. Le PATH est
-            // exporté dans chaque stage shell car chaque `sh` ouvre un shell
-            // neuf (l'export ne persiste pas d'un stage à l'autre).
             steps {
+                runCmd 'mkdir -p $HOME'
                 runCmd 'python -m pip install --user --upgrade pip'
                 runCmd 'pip install --user -r requirements-dev.txt'
             }
@@ -57,26 +53,23 @@ pipeline {
         }
 
         stage('Standard de code (lint)') {
-            // Prérequis d'une bonne CI, chapitre 4 partie 3 : le style est
-            // vérifié par la machine, la revue de code se concentre sur le fond.
+            // On limite flake8 aux dossiers applicatifs du projet et on passe
+            // la config explicitement, pour ne dépendre ni du répertoire
+            // courant ni d'un éventuel .local résiduel.
             steps {
-                runCmd 'export PATH=$HOME/.local/bin:$PATH && flake8 .'
+                runCmd 'export PATH=$HOME/.local/bin:$PATH && flake8 --max-line-length=100 patients rendezvous personnel sunusante'
             }
         }
 
         stage('Tests') {
-            // Unitaires, intégration et système (TP1-TP4) sont tous exécutés
-            // ici par le même appel : manage.py les découvre automatiquement.
             steps {
                 runCmd 'python manage.py test'
             }
         }
 
         stage('Sécurité - SAST') {
-            // cf. chapitre 3 et chapitre 4 partie 2 : "tests de sécurité,
-            // cf. SAST/DAST/SCA au chapitre 3".
             steps {
-                runCmd 'export PATH=$HOME/.local/bin:$PATH && semgrep --config p/security-audit --config p/django --config p/python --error .'
+                runCmd 'export PATH=$HOME/.local/bin:$PATH && semgrep --config p/security-audit --config p/django --config p/python --error patients rendezvous personnel sunusante'
             }
         }
 
