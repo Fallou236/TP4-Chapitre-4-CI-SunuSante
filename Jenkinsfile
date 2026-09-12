@@ -23,15 +23,11 @@ pipeline {
     }
 
     environment {
-        // L'agent tourne avec l'UID de Jenkins (1000), qui n'a pas de home
-        // accessible dans l'image python:3.11-slim. On redirige les caches
-        // et les installations pip vers le workspace, où l'UID a les droits.
+        // L'agent tourne avec l'UID de Jenkins (1000), sans home accessible
+        // dans python:3.11-slim. On redirige HOME et le cache pip vers le
+        // workspace, où l'UID a les droits en écriture.
         HOME = "${WORKSPACE}"
-        PYTHONUSERBASE = "${WORKSPACE}/.local"
         PIP_CACHE_DIR = "${WORKSPACE}/.pip-cache"
-        // Les paquets installés avec --user vont dans PYTHONUSERBASE/bin :
-        // on l'ajoute au PATH pour que flake8, pytest, semgrep... soient trouvés.
-        PATH = "${WORKSPACE}/.local/bin:${PATH}"
     }
 
     stages {
@@ -42,6 +38,11 @@ pipeline {
         }
 
         stage('Installation des dépendances') {
+            // --user installe dans $HOME/.local ; on exporte ensuite
+            // $HOME/.local/bin dans le PATH pour que flake8, semgrep et
+            // pip-audit soient trouvés par les stages suivants. Le PATH est
+            // exporté dans chaque stage shell car chaque `sh` ouvre un shell
+            // neuf (l'export ne persiste pas d'un stage à l'autre).
             steps {
                 runCmd 'python -m pip install --user --upgrade pip'
                 runCmd 'pip install --user -r requirements-dev.txt'
@@ -49,10 +50,6 @@ pipeline {
         }
 
         stage('Build') {
-            // Python ne se compile pas comme Java, mais on peut quand
-            // même vérifier que le projet est valide avant d'aller plus
-            // loin : configuration Django cohérente, fichiers statiques
-            // collectables sans erreur.
             steps {
                 runCmd 'python manage.py check'
                 runCmd 'python manage.py collectstatic --noinput --dry-run'
@@ -61,17 +58,15 @@ pipeline {
 
         stage('Standard de code (lint)') {
             // Prérequis d'une bonne CI, chapitre 4 partie 3 : le style est
-            // vérifié par la machine, la revue de code se concentre sur le
-            // fond.
+            // vérifié par la machine, la revue de code se concentre sur le fond.
             steps {
-                runCmd 'flake8 .'
+                runCmd 'export PATH=$HOME/.local/bin:$PATH && flake8 .'
             }
         }
 
         stage('Tests') {
-            // Unitaires, intégration et système (TP1-TP4) sont tous
-            // exécutés ici par le même appel : manage.py les découvre
-            // automatiquement.
+            // Unitaires, intégration et système (TP1-TP4) sont tous exécutés
+            // ici par le même appel : manage.py les découvre automatiquement.
             steps {
                 runCmd 'python manage.py test'
             }
@@ -81,13 +76,13 @@ pipeline {
             // cf. chapitre 3 et chapitre 4 partie 2 : "tests de sécurité,
             // cf. SAST/DAST/SCA au chapitre 3".
             steps {
-                runCmd 'semgrep --config p/security-audit --config p/django --config p/python --error .'
+                runCmd 'export PATH=$HOME/.local/bin:$PATH && semgrep --config p/security-audit --config p/django --config p/python --error .'
             }
         }
 
         stage('Sécurité - SCA') {
             steps {
-                runCmd 'pip-audit -r requirements.txt'
+                runCmd 'export PATH=$HOME/.local/bin:$PATH && pip-audit -r requirements.txt'
             }
         }
     }
