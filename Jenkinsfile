@@ -7,10 +7,7 @@
 //
 // Portabilité (voir INSTALLATION_JENKINS.md) : avec l'agent Docker
 // (recommandé), tous les stages tournent dans un conteneur Linux, quel
-// que soit le système d'exploitation qui héberge Jenkins. Si vous utilisez
-// `agent any` (agent Jenkins natif, sans Docker), runCmd() bascule
-// automatiquement entre `sh` (Linux/macOS) et `bat` (Windows) : aucune
-// autre ligne du pipeline n'a besoin de changer.
+// que soit le système d'exploitation qui héberge Jenkins.
 
 def runCmd(String commande) {
     if (isUnix()) {
@@ -25,6 +22,18 @@ pipeline {
         docker { image 'python:3.11-slim' }
     }
 
+    environment {
+        // L'agent tourne avec l'UID de Jenkins (1000), qui n'a pas de home
+        // accessible dans l'image python:3.11-slim. On redirige les caches
+        // et les installations pip vers le workspace, où l'UID a les droits.
+        HOME = "${WORKSPACE}"
+        PYTHONUSERBASE = "${WORKSPACE}/.local"
+        PIP_CACHE_DIR = "${WORKSPACE}/.pip-cache"
+        // Les paquets installés avec --user vont dans PYTHONUSERBASE/bin :
+        // on l'ajoute au PATH pour que flake8, pytest, semgrep... soient trouvés.
+        PATH = "${WORKSPACE}/.local/bin:${PATH}"
+    }
+
     stages {
         stage('Récupération du code') {
             steps {
@@ -34,8 +43,8 @@ pipeline {
 
         stage('Installation des dépendances') {
             steps {
-                runCmd 'python -m pip install --upgrade pip'
-                runCmd 'pip install -r requirements-dev.txt'
+                runCmd 'python -m pip install --user --upgrade pip'
+                runCmd 'pip install --user -r requirements-dev.txt'
             }
         }
 
