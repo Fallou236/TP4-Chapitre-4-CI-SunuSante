@@ -30,9 +30,7 @@ pipeline {
         stage('Récupération du code') {
             steps {
                 checkout scm
-                // Nettoie tout .local/.pip-cache résiduel d'un build
-                // antérieur (créé quand HOME pointait sur le workspace),
-                // sinon flake8 les scannerait encore.
+                // Nettoie tout résidu d'un build antérieur avant analyse.
                 runCmd 'rm -rf .local .pip-cache staticfiles'
             }
         }
@@ -53,11 +51,10 @@ pipeline {
         }
 
         stage('Standard de code (lint)') {
-            // On limite flake8 aux dossiers applicatifs du projet et on passe
-            // la config explicitement, pour ne dépendre ni du répertoire
-            // courant ni d'un éventuel .local résiduel.
+            // flake8 lit sa configuration depuis le fichier .flake8 versionné
+            // avec le code (max-line-length, dossiers exclus).
             steps {
-                runCmd 'export PATH=$HOME/.local/bin:$PATH && flake8 --max-line-length=100 patients rendezvous personnel sunusante'
+                runCmd 'export PATH=$HOME/.local/bin:$PATH && flake8 .'
             }
         }
 
